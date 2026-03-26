@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCE: Digital Grid Lockout</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --terminal-green: #39ff14;
+            --alert-red: #ff3333;
+            --safety-yellow: #ffd700;
+            --text-color: #e6edf3;
+            --border-color: #30363d;
+            --font-stack: 'Courier New', Courier, monospace;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-stack);
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        #app-container {
+            max-width: 800px;
+            width: 100%;
+            border: 2px solid var(--border-color);
+            padding: 25px;
+            background-color: #161b22;
+            box-shadow: 0 0 30px rgba(0,0,0,0.9);
+        }
+
+        .header-title { color: var(--safety-yellow); border-bottom: 2px solid var(--safety-yellow); padding-bottom: 10px; margin-bottom: 20px; text-transform: uppercase;}
+        .danger-text { color: var(--alert-red); }
+        .success-text { color: var(--terminal-green); }
+
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        input, select, button {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #0d1117;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            font-family: var(--font-stack);
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #21262d;
+            cursor: pointer;
+            transition: 0.2s;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        button:hover { background-color: #30363d; border-color: var(--text-color); }
+
+        .option-btn { text-align: left; margin-bottom: 12px; line-height: 1.5; font-size: 0.95em; border-left: 4px solid #30363d; }
+        .option-btn:hover { border-left: 4px solid var(--safety-yellow); color: var(--safety-yellow); }
+
+        #progress-wrapper { width: 100%; background: #000; height: 10px; margin-bottom: 20px; border: 1px solid var(--border-color); }
+        #progress-fill { height: 100%; background: var(--terminal-green); width: 0%; transition: width 0.4s; }
+
+        .scenario-box { background: #0d1117; padding: 15px; border: 1px solid var(--border-color); margin-bottom: 20px; color: #8b949e; }
+        .certificate { border: 4px double var(--terminal-green); padding: 30px; text-align: center; background: #000; }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    
+    <div id="screen-login" class="screen active">
+        <h1 class="header-title">⚡ DIGITAL GRID LOCKOUT</h1>
+        <p>SYSTEM STATUS: <span class="danger-text">OFFLINE</span></p>
+        <p>Identify the <strong>LIE</strong> in each round to bypass the security gates. Statements are randomized per session.</p>
+        <input type="text" id="userName" placeholder="ENTER FULL NAME" required>
+        <select id="userCrew">
+            <option value="">SELECT DIVISION...</option>
+            <option value="IT/DGS">IT/DGS</option>
+            <option value="DGS/Grid Technology">DGS/Grid Technology</option>
+            <option value="DGS/Network&Telecom">DGS/Network&Telecom</option>
+        </select>
+        <button onclick="startGame()" style="color: var(--safety-yellow); border-color: var(--safety-yellow);">INITIALIZE BYPASS</button>
+    </div>
+
+    <div id="screen-game" class="screen">
+        <div id="progress-wrapper"><div id="progress-fill"></div></div>
+        <h2 id="gate-header">GATE 01/12</h2>
+        <div class="scenario-box" id="scenario-text">Scenario loading...</div>
+        <p style="font-size: 0.8em; color: var(--safety-yellow); margin-bottom: 10px;">[SECURITY CHALLENGE: SELECT THE INCORRECT STATEMENT]</p>
+        <div id="options-container"></div>
+    </div>
+
+    <div id="screen-fail" class="screen">
+        <h1 class="danger-text">⚠️ BREAKER TRIPPED</h1>
+        <p>CRITICAL SAFETY ERROR. LOG ANALYSIS:</p>
+        <div style="background: rgba(255, 51, 51, 0.1); padding: 20px; border-left: 4px solid var(--alert-red); margin-bottom: 20px;">
+            <p id="fail-reason"></p>
+        </div>
+        <button onclick="restartGame()">REBOOT SYSTEM</button>
+    </div>
+
+    <div id="screen-success" class="screen">
+        <h1 class="success-text">✔️ GRID RESTORED</h1>
+        <div class="certificate">
+            <h2 style="color: var(--safety-yellow);">GRID MASTER CERTIFIED</h2>
+            <p><strong>OFFICER:</strong> <span id="cert-name"></span></p>
+            <p><strong>DIVISION:</strong> <span id="cert-crew"></span></p>
+            <p><strong>STATUS:</strong> 12/12 GATES SECURED</p>
+        </div>
+        <p style="text-align: center; margin-top: 20px;">Screenshot this terminal for your official safety entry.</p>
+    </div>
+
+</div>
+
+<script>
+    // Full Data Set with shuffling logic
+    const rawQuestions = [
+        {
+            title: "Round 1: Field Tech Gear",
+            lie: "Modern digital meters are 'arc-proof' by design, so face shields are optional for data-port plug-ins.",
+            truths: [
+                "Leather work gloves can conduct electricity if they are damp or have carbon buildup.",
+                "Your SCE ID lanyard is a snag hazard and must be breakaway or tucked in."
+            ],
+            reality: "Reality: A data port can still bridge a fault; never skip the face shield if the protocol calls for it."
+        },
+        {
+            title: "Round 2: Remote Work",
+            lie: "A 'tingle' in your wrist while using a mouse is just a sign of poor circulation, not injury.",
+            truths: [
+                "Most home office fires in SoCal are caused by 'daisy-chaining' power strips.",
+                "The 20-20-20 rule (looking 20ft away every 20 mins) prevents ocular migraines."
+            ],
+            reality: "Reality: That tingle is a stage-one RSI warning. Ignore it, and you're looking at surgery."
+        },
+        {
+            title: "Round 3: High Heat",
+            lie: "Drinking ice-cold water is the fastest way to lower your core temp in 100°F weather.",
+            truths: [
+                "You can faint ('Heat Syncope') just by standing still too long in a hot substation.",
+                "Stopping sweating and having clammy skin is an immediate medical emergency."
+            ],
+            reality: "Reality: Room temp water absorbs faster. Ice-cold water can cause stomach cramps and slow down rehydration."
+        },
+        {
+            title: "Round 4: Fleet Safety",
+            lie: "Backing into a parking space is 'less safe' because it requires more focus at shift-end.",
+            truths: [
+                "360-degree walkarounds are required even if parked at a marked SCE facility.",
+                "Loose equipment in a truck cab can become a lethal projectile in a 35mph collision."
+            ],
+            reality: "Reality: 'First Motion Forward' is the gold standard. Always back in so you can exit safely."
+        },
+        {
+            title: "Round 5: Compliance & Cyber",
+            lie: "Cybersecurity protocols are only for office staff; field techs are 'air-gapped'.",
+            truths: [
+                "Propping a secure server room door for 60 seconds is a reportable violation.",
+                "Sharing your General Access badge with a coworker is a fireable safety offense."
+            ],
+            reality: "Reality: A corrupted USB used for field diagnostics is one of the biggest threats to the physical grid."
+        },
+        {
+            title: "Round 6: Step Potential",
+            lie: "Running away from a downed line is safe if you take large, fast strides.",
+            truths: [
+                "The ground around a downed line is energized in concentric circles like ripples in a pond.",
+                "Stay at least 30 feet away from any downed line until confirmed de-energized."
+            ],
+            reality: "Reality: Large strides bridge the voltage gap between your feet. You must shuffle or hop."
+        },
+        {
+            title: "Round 7: 120V Hazards",
+            lie: "Most electrical fatalities occur on high-voltage transmission lines.",
+            truths: [
+                "A standard 120V outlet has enough kick to freeze your muscles so you can't let go.",
+                "Sweat on your skin drops your body's electrical resistance by nearly 90%."
+            ],
+            reality: "Reality: More people die from 120V/240V because they treat it with less respect than high-voltage lines."
+        },
+        {
+            title: "Round 8: Ladders",
+            lie: "It is safe to stand on the top cap of a stepladder if someone is spotting you.",
+            truths: [
+                "You must maintain 'three points of contact' even when climbing into a truck bed.",
+                "Metal ladders are strictly prohibited within 10 feet of energized sources."
+            ],
+            reality: "Reality: The top cap is never a step. Ever."
+        },
+        {
+            title: "Round 9: Trenching/Gas",
+            lie: "If you are in an open-air trench, you don't need to worry about air quality.",
+            truths: [
+                "Soil can 'filter' the smell out of a gas leak, making it scentless.",
+                "Nitrogen used in transformer blankets is an asphyxiant you can't see or smell."
+            ],
+            reality: "Reality: Heavier-than-air gases settle in trenches and displace oxygen even if it's 'open'."
+        },
+        {
+            title: "Round 10: Tools",
+            lie: "FR clothing loses all protection if washed with standard liquid detergent.",
+            truths: [
+                "Using a screwdriver as a pry bar is a safety risk because the shaft can snap.",
+                "Z87 rating is required for safety glasses; designer sunglasses don't count."
+            ],
+            reality: "Reality: It’s fabric softener and bleach you must avoid; standard detergent is usually fine."
+        },
+        {
+            title: "Round 11: Monitors",
+            lie: "Sitting closer to your screen helps reduce eye strain.",
+            truths: [
+                "Blue light from monitors can disrupt sleep, leading to fatigue accidents.",
+                "Improperly angled monitors cause 'tech-neck' and upper back tension."
+            ],
+            reality: "Reality: The 'Harmonic Distance' (arm's length) is required to keep eye muscles relaxed."
+        },
+        {
+            title: "Round 12: Complacency",
+            lie: "Muscle memory is the best safety tool because you react without thinking.",
+            truths: [
+                "Workers with 10-15 years experience have higher accident rates than new hires.",
+                "The most dangerous time of a shift is the last 30 minutes."
+            ],
+            reality: "Reality: Muscle memory leads to complacency. Safety requires 'Active Mindfulness' every time."
+        }
+    ];
+
+    let currentStep = 0;
+    let userName = "";
+    let userCrew = "";
+
+    function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    function startGame() {
+        userName = document.getElementById('userName').value;
+        userCrew = document.getElementById('userCrew').value;
+        if(!userName || !userCrew) return alert("System requires ID to begin.");
+        currentStep = 0;
+        showQuestion();
+        document.getElementById('screen-login').classList.remove('active');
+        document.getElementById('screen-game').classList.add('active');
+    }
+
+    function showQuestion() {
+        const qData = rawQuestions[currentStep];
+        document.getElementById('gate-header').innerText = `GATE ${String(currentStep + 1).padStart(2, '0')}/12 - ${qData.title}`;
+        document.getElementById('scenario-text').innerText = "Analyze the incoming data stream and isolate the incorrect statement.";
+        document.getElementById('progress-fill').style.width = ((currentStep / 12) * 100) + "%";
+        
+        // Prepare options: 1 lie + 2 truths
+        let options = [
+            { text: qData.lie, isLie: true },
+            { text: qData.truths[0], isLie: false },
+            { text: qData.truths[1], isLie: false }
+        ];
+        
+        // Randomly shuffle the order of the buttons
+        shuffle(options);
+
+        const container = document.getElementById('options-container');
+        container.innerHTML = "";
+        options.forEach((opt) => {
+            const b = document.createElement('button');
+            b.className = "option-btn";
+            b.innerText = opt.text;
+            b.onclick = () => {
+                if(opt.isLie) {
+                    currentStep++;
+                    if(currentStep === 12) finish();
+                    else showQuestion();
+                } else {
+                    document.getElementById('fail-reason').innerText = qData.reality;
+                    document.getElementById('screen-game').classList.remove('active');
+                    document.getElementById('screen-fail').classList.add('active');
+                }
+            };
+            container.appendChild(b);
+        });
+    }
+
+    function restartGame() {
+        currentStep = 0;
+        showQuestion();
+        document.getElementById('screen-fail').classList.remove('active');
+        document.getElementById('screen-game').classList.add('active');
+    }
+
+    function finish() {
+        document.getElementById('cert-name').innerText = userName.toUpperCase();
+        document.getElementById('cert-crew').innerText = userCrew.toUpperCase();
+        document.getElementById('screen-game').classList.remove('active');
+        document.getElementById('screen-success').classList.add('active');
+    }
+</script>
+</body>
+</html>
